@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Friender</title>
+
+  <script src="https://unpkg.com/jquery"></script>
+
+  <link rel="stylesheet" href="https://www.unpkg.com/bootstrap-icons/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/static/stylesheets/style.css">
+  <link rel="shortcut icon" href="/static/favicon.ico">
+</head>
+
+<body class="{% block body_class %}{% endblock %}">
+
+  <div class="container">
+
+    <form method="POST" action="upload" enctype="multipart/form-data">
+        <label for="image-file">Image</label>
+        <input name="image-file" id="image-file" type="file">
+        <button type="submit" value="Upload">Submit</button>
+    </form>
+
+    <ul>
+      {% for item in images %}
+        <li>
+          <img src={{ item }} style="width: 250px">
+        </li>
+      {% endfor %}
+    </ul>
+
+  </div>
+</body>
+
+</html>
