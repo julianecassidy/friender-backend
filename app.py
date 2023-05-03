@@ -1,13 +1,15 @@
 """Flask app for Friender app."""
 
 import os
+from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, request
 from flask_debugtoolbar import DebugToolbarExtension
 from werkzeug.utils import secure_filename
 
-from models import db, connect_db, Photos
-from s3 import upload_photo, get_user_image
+from models import db, connect_db, Photo
 # from forms import #FORMS HERE
+
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']

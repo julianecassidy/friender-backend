@@ -1,7 +1,6 @@
 """SQL Alchemy models for Friender."""
 
 import os
-from datetime import datetime
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 import boto3
@@ -15,15 +14,132 @@ db = SQLAlchemy()
 DEFAULT_IMAGE_FILE = "default-image.jpg"
 DEFAULT_IMAGE_OBJECT = "username-12345"
 
-s3_client = boto3.client(
-    's3', 
-    aws_access_key_id = os.environ['ACCESS_KEY'], 
-    aws_secret_access_key = os.environ['AWS_SECRET_KEY'], 
-    config=Config(signature_version='s3v4')
-    ) 
+# s3_client = boto3.client(
+#     's3', 
+#     # aws_access_key_id = os.environ['ACCESS_KEY'], 
+#     # aws_secret_access_key = os.environ['AWS_SECRET_KEY'], 
+#     config=Config(signature_version='s3v4')
+#     ) 
 
 AWS_S3_REGION_NAME = "us-east-2"
 AWS_S3_SIGNATURE_VERSION = "s3v4"
+
+
+class Photo(db.Model):
+    """Photos storage locations for all users' photos."""
+
+    __tablename__ = "photos"
+
+    file_name = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    user_id = db.Column(
+        db.Text,
+        db.ForeignKey('users.username'),
+        nullable=False
+    )
+
+    ## Relationship User <-> Photos
+
+    # @classmethod
+    # def upload_photo(self, file_name, bucket="friender_user_photos"):
+    #     """Uploads a file to Friender user photos bucket on S3. 
+    #     Requires file_name and object_name of the image.
+    #     Returns true if image successfully uploaded or false if not."""
+
+    #     print("FILENAME IN MODELS", file_name)
+    #     try:
+    #         response = s3_client.upload_file(file_name, bucket, file_name)
+    #     except ClientError as e:
+    #         print(e)
+    #         return False
+    #     return True
+
+    # @classmethod
+    # def get_user_image(bucket="frienderuserphotos"):
+    #     """Generate URL to provide image source for a user's image."""
+
+    #     print("GET_USER_IMAGE")
+
+    #     public_urls = []
+    #     user_photos = ['uploads/rv.jpg',
+    #                    'uploads/tree.jpg', 'uploads/MetLife.png']
+
+    #     try:
+    #         for item in user_photos:
+    #             presigned_url = s3_client.generate_presigned_url(
+    #                 'get_object',
+    #                 Params={
+    #                     'Bucket': bucket,
+    #                     'Key': item},
+    #                 ExpiresIn=3600)
+    #             public_urls.append(presigned_url)
+    #     except Exception as e:
+    #         pass
+    #     # print("[INFO] : The contents inside show_image = ", public_urls)
+    #     return public_urls
+    
+
+class Match(db.Model):
+    """Matches where both users have requested the other."""
+
+    __tablename__ = "matches"
+
+    user_1 = db.Column(
+        db.Text,
+        db.ForeignKey('users.username'),
+        primary_key=True
+    )
+
+    user_2 = db.Column(
+        db.Text,
+        db.ForeignKey('users.username'),
+        primary_key=True
+    )
+
+    ## Relationship between User <-> User via Match
+
+
+class Like(db.Model):
+    """Requests to match from a liking user to a liked user."""
+
+    __tablename__ = "likes"
+
+    liking_user = db.Column(
+        db.Text,
+        db.ForeignKey('users.username'),
+        primary_key=True
+    )
+
+    liked_user = db.Column(
+        db.Text,
+        db.ForeignKey('users.username'),
+        nullable=False
+    )
+
+    ## Relationship between User <-> User via Like
+
+
+class Dislike(db.Model):
+    """Requests not to match from a disliking user to a disliked user."""
+
+    __tablename__ = "dislikes"
+
+    disliking_user = db.Column(
+        db.Text,
+        db.ForeignKey('users.username'),
+        primary_key=True
+    )
+
+    disliked_user = db.Column(
+        db.Text,
+        db.ForeignKey('users.username'),
+        nullable=False
+    )
+
+    ## Relationship between User <-> User via Dislike
 
 
 class User(db.Model):
@@ -69,95 +185,30 @@ class User(db.Model):
         default=10
     )
 
+    photos = db.relationship('Photo', backref="user")
 
-class Photo(db.Model):
-    """Photos storage locations for all users' photos."""
-
-    __tablename__ = "photos"
-
-    file_name = db.Column(
-        db.Integer,
-        primary_key=True
+    matches = db.relationship(
+        "User",
+        secondary="matches",
+        primaryjoin=(Match.user_1 == username),
+        secondaryjoin=(Match.user_2 == username),
+        backref="matched"
     )
 
-    user_id = db.Column(
-        db.Text,
-        db.ForeignKey('users.username'),
-        nullable=False
+    liked_user = db.relationship(
+        "User",
+        secondary="likes",
+        primaryjoin=(Like.liked_user == username),
+        secondaryjoin=(Like.liking_user == username),
+        backref="liking_user"
     )
 
-    @classmethod
-    def upload_photo(self, file_name, bucket="friender_user_photos"):
-        """Uploads a file to Friender user photos bucket on S3. 
-        Requires file_name and object_name of the image.
-        Returns true if image successfully uploaded or false if not."""
-
-        print("FILENAME IN MODELS", file_name)
-        try:
-            response = s3_client.upload_file(file_name, bucket, file_name)
-        except ClientError as e:
-            print(e)
-            return False
-        return True
-
-    @classmethod
-    def get_user_image(bucket="frienderuserphotos"):
-        """Generate URL to provide image source for a user's image."""
-
-        print("GET_USER_IMAGE")
-
-        public_urls = []
-        user_photos = ['uploads/rv.jpg',
-                       'uploads/tree.jpg', 'uploads/MetLife.png']
-
-        try:
-            for item in user_photos:
-                presigned_url = s3_client.generate_presigned_url(
-                    'get_object',
-                    Params={
-                        'Bucket': bucket,
-                        'Key': item},
-                    ExpiresIn=3600)
-                public_urls.append(presigned_url)
-        except Exception as e:
-            pass
-        # print("[INFO] : The contents inside show_image = ", public_urls)
-        return public_urls
-    
-
-class Match(db.Model):
-    """Matches where both users have requested the other."""
-
-    __tablename__ = "matches"
-
-    user_1 = db.Column(
-        db.Text,
-        db.ForeignKey('users.username'),
-        nullable=False
-    )
-
-    user_2 = db.Column(
-        db.Text,
-        db.ForeignKey('users.username'),
-        nullable=False
-    )
-
-
-class Request(db.Model):
-    """Requests to match from a liking user to a liked user."""
-
-    __tablename__ = "requests"
-
-    liking_user = db.Column(
-        db.Text,
-        db.ForeignKey('users.username'),
-        nullable=False
-    )
-
-    liked_user = db.Column(
-        db.Text,
-        db.ForeignKey('users.username'),
-        nullable=False
+    disliked_user = db.relationship(
+        "User",
+        secondary="dislikes",
+        primaryjoin=(Dislike.disliked_user == username),
+        secondaryjoin=(Dislike.disliking_user == username),
+        backref="disliking_user"
     )
 
 
