@@ -211,6 +211,25 @@ class User(db.Model):
         backref="disliking_user"
     )
 
+    @classmethod
+    def signup(cls, username, password, name, hobbies, interests, postal_code, search_radius):
+        """ Sign up user. Hashes password and adds user to database."""
+
+        hashed_pwd = bcrypt.generate_password_hash(password).decode('UTF-8')
+
+        user = User(
+            username=username,
+            password=hashed_pwd,
+            name=name,
+            hobbies=hobbies,
+            interests=interests,
+            postal_code=postal_code,
+            search_radius=search_radius
+        )
+
+        db.session.add(user)
+        return user
+
 
 def connect_db(app):
     """Connect this database to provided Flask app.
