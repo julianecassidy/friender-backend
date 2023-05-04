@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, g
 from flask_debugtoolbar import DebugToolbarExtension
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import BadRequest, Unauthorized
@@ -114,7 +115,7 @@ def login():
 
 @app.get('/users/<username>')
 @require_user
-def get_user(current_user, username):
+def get_user(username):
     """Get user from database. Must be logged in."""
 
     user_instance = User.query.get_or_404(username)
@@ -126,7 +127,6 @@ def get_user(current_user, username):
 def update_user_profile(username):
     """Update a user's information. Must be logged in as same user in params."""
 
-    print("USERNAME, G.USER", username, g.user.username)
     if username != g.user.username:
         raise Unauthorized
     
@@ -144,7 +144,34 @@ def update_user_profile(username):
     updated_user = updated_user_instance.serialize()
     return jsonify(updated_user)
     
+@app.delete('/users/<username>')
+@require_user
+def delete_user(username):
+    """Delete a user's account. Must be logged in as same user in params."""
 
+    if username != g.user.username:
+        raise Unauthorized
+    
+    Match.query.filter(or_(
+        Match.user_1==username, 
+        Match.user_2==username
+    )).delete()
+
+    Like.query.filter(or_(
+        Like.liking_user==username, 
+        Like.liked_user==username
+    )).delete()
+    
+    Dislike.query.filter(or_(
+        Dislike.disliking_user==username, 
+        Dislike.disliked_user==username
+    )).delete()
+    
+    Photo.query.filter(Photo.user_id==username).delete()
+    db.session.delete(g.user)
+    db.session.commit()
+
+    return f"{username} deleted"
 
 
 
