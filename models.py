@@ -1,18 +1,22 @@
 """SQL Alchemy models for Friender."""
 
 import os
+from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 import boto3
 from botocore.exceptions import ClientError
 from botocore.client import Config
+import jwt
 
+load_dotenv()
 
 bcrypt = Bcrypt()
 db = SQLAlchemy()
 
 DEFAULT_IMAGE_FILE = "default-image.jpg"
 DEFAULT_IMAGE_OBJECT = "username-12345"
+SECRET_KEY = os.environ['SECRET_KEY']
 
 # s3_client = boto3.client(
 #     's3', 
@@ -213,7 +217,7 @@ class User(db.Model):
 
     @classmethod
     def signup(cls, username, password, name, hobbies, interests, postal_code, search_radius):
-        """ Sign up user. Hashes password and adds user to database."""
+        """Sign up user. Hashes password and adds user to database."""
 
         hashed_pwd = bcrypt.generate_password_hash(password).decode('UTF-8')
 
@@ -229,7 +233,41 @@ class User(db.Model):
 
         db.session.add(user)
         return user
+    
+    @classmethod
+    def login(cls, username, password):
+        """Log in user. Find user with "username" and "password" and return that
+        user.
+        
+        If there is no matching username or the password is wrong, return false."""
 
+        user = cls.query.filter_by(username=username).first()
+
+        if user:
+            is_auth = bcrypt.check_password_hash(user.password, password)
+            if is_auth:
+                return user
+        
+        return False
+
+    @classmethod
+    def create_token(cls, username):
+        """Create a JWT for user and return."""
+
+        return jwt.encode({"username": username}, SECRET_KEY, algorithm="HS256")
+
+    def serialize(self):
+        """Make a dictionary of current user instance."""
+
+        user = {
+            "username": self.username,
+            "name": self.name,
+            "interests": self.interests,
+            "hobbies": self.hobbies,
+            "postal_code": self.postal_code,
+            "search_radius": self.search_radius}
+        
+        return user
 
 def connect_db(app):
     """Connect this database to provided Flask app.

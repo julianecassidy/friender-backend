@@ -2,16 +2,16 @@
 
 import os
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, Unauthorized
 import jwt
 
 
 from models import db, connect_db, User, Photo, Match, Like, Dislike
-from tokens import create_token
+from auth_middleware import require_user
 
 load_dotenv()
 
@@ -32,19 +32,45 @@ connect_db(app)
 debug = DebugToolbarExtension(app)
 
 
-####################################################### User Signup/Login/Logout
+################################################################################
+#  User Signup/Login/Logout
 
+@app.before_request
+def add_user_to_g():
+    """If there is a user logged in, add the current user to Flask global."""
+
+    token = None
+    if "Authorization" in request.headers:
+        token = request.headers["Authorization"]
+
+    if token:
+        try:
+            data = jwt.decode(token, os.environ['SECRET_KEY'], algorithms=["HS256"])
+            print("IS THERE ERROR HERE?")
+            current_user = User.query.get(data["username"])
+            if current_user is None:
+                raise Unauthorized("Invalid token.")
+            else:
+                g.user = current_user
+            
+        except Exception as e:
+            raise Unauthorized("Invalid token")
+    
+    else:
+        g.user = None
+    
+    
 
 @app.post('/signup')
-def singup():
+def signup():
     """Handle user signup.
 
     Take inputted JSON user data and create new user in DB. Return JWT.
-    If errors, throw BadRequestError.
+    If errors, throw BadRequest Error.
     """
 
     try:
-        user = User.signup(
+        User.signup(
             username=request.json["username"],
             password=request.json["password"],
             name=request.json["name"],
@@ -59,14 +85,65 @@ def singup():
         db.session.rollback()
         raise BadRequest("Username already in use. No user created.")
 
-    token = create_token(request.json["username"])
+    token = User.create_token(request.json["username"])
     return jsonify(token)
 
 
+@app.post('/login')
+def login():
+    """Handle user login.
+
+    Taken JSON username and password. Return JWT if valid user.
+    If invalid, throw Unauthorized Error."""
+
+    user = User.login(
+        username=request.json["username"],
+        password=request.json["password"]
+    )
+
+    if user:
+        token = User.create_token(user.username)
+        return jsonify(token)
+    
+    else:
+        raise Unauthorized("Username/password invalid.")
 
 
+################################################################################
+# User Routes
 
+@app.get('/users/<username>')
+@require_user
+def get_user(current_user, username):
+    """Get user from database. Must be logged in."""
 
+    user_instance = User.query.get_or_404(username)
+    user = user_instance.serialize()
+    return jsonify(user)
+
+@app.patch('/users/<username>')
+@require_user
+def update_user_profile(username):
+    """Update a user's information. Must be logged in as same user in params."""
+
+    print("USERNAME, G.USER", username, g.user.username)
+    if username != g.user.username:
+        raise Unauthorized
+    
+    user = User.query.get_or_404(username)
+
+    user.name = request.json["name"]
+    user.hobbies=request.json["hobbies"],
+    user.interests=request.json["interests"],
+    user.postal_code=request.json["postal_code"],
+    user.search_radius=request.json["search_radius"]
+
+    db.session.commit()
+
+    updated_user_instance = User.query.get(username)
+    updated_user = updated_user_instance.serialize()
+    return jsonify(updated_user)
+    
 
 
 
