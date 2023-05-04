@@ -17,6 +17,7 @@ db = SQLAlchemy()
 DEFAULT_IMAGE_FILE = "default-image.jpg"
 DEFAULT_IMAGE_OBJECT = "username-12345"
 SECRET_KEY = os.environ['SECRET_KEY']
+USER_IMAGE_BUCKET = "frienderuserphotos"
 
 s3_client = boto3.client(
     's3', 
@@ -35,7 +36,7 @@ class Photo(db.Model):
     __tablename__ = "photos"
 
     file_name = db.Column(
-        db.Integer,
+        db.String(),
         primary_key=True
     )
 
@@ -48,7 +49,7 @@ class Photo(db.Model):
     ## Relationship User <-> Photos
 
     @classmethod
-    def upload_photo(cls, file_name, bucket="friender_user_photos"):
+    def upload_photo(cls, file_name, bucket=USER_IMAGE_BUCKET):
         """Uploads a file to Friender user photos bucket on S3. 
         Requires file_name and object_name of the image.
         Returns true if image successfully uploaded or false if not."""
@@ -58,12 +59,11 @@ class Photo(db.Model):
         try:
             response = s3_client.upload_file(file_name, bucket, file_name)
         except ClientError as e:
-            print(e)
             return False
         return True
 
     @classmethod
-    def get_user_image(cls, image_ids, bucket="frienderuserphotos"):
+    def get_user_images(cls, image_ids, bucket=USER_IMAGE_BUCKET):
         """Generate URL to provide image source for a user's image."""
 
         print("GET_USER_IMAGE")

@@ -10,8 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import BadRequest, Unauthorized
 import jwt
-import uuid
 import logging
+import uuid
 
 
 from models import db, connect_db, User, Photo, Match, Like, Dislike
@@ -29,7 +29,7 @@ UPLOAD_FOLDER = "uploads"
 
 connect_db(app)
 
-logging.getLogger('flask_cors').level = logging.DEBUG
+# logging.getLogger('flask_cors').level = logging.DEBUG
 
 # Having the Debug Toolbar show redirects explicitly is often useful;
 # however, if you want to turn it off, you can uncomment this line:
@@ -42,29 +42,30 @@ debug = DebugToolbarExtension(app)
 ################################################################################
 #  User Signup/Login/Logout
 
-# @app.before_request
-# def add_user_to_g():
-#     """If there is a user logged in, add the current user to Flask global."""
+@app.before_request
+def add_user_to_g():
+    """If there is a user logged in, add the current user to Flask global."""
 
-#     token = None
-#     if "Authorization" in request.headers:
-#         token = request.headers["Authorization"]
+    token = None
+    if "Authorization" in request.headers:
+        token = request.headers["Authorization"]
 
-#     if token:
-#         try:
-#             data = jwt.decode(token, os.environ['SECRET_KEY'], algorithms=["HS256"])
-#             print("IS THERE ERROR HERE?")
-#             current_user = User.query.get(data["username"])
-#             if current_user is None:
-#                 raise Unauthorized("Invalid token.")
-#             else:
-#                 g.user = current_user
+    if token:
+        try:
+            data = jwt.decode(token, os.environ['SECRET_KEY'], algorithms=["HS256"])
+            print("TOKEN DATA", data)
+            current_user = User.query.get(data["username"])
+            print("CURRENT USER", current_user)
+            if current_user is None:
+                raise Unauthorized("Invalid token.")
+            else:
+                g.user = current_user
             
-#         except Exception as e:
-#             raise Unauthorized("Invalid token")
+        except Exception as e:
+            raise Unauthorized("Invalid token")
     
-#     else:
-#         g.user = None
+    else:
+        g.user = None
     
     
 
@@ -189,36 +190,37 @@ def delete_user(username):
 # Photo Routes
 
 @app.get("/<username>/photos")
-# @require_user
+@require_user
 def get_photos(username):
     """Return all photos for a given username. Must be logged in to access."""
-    return "hello"
-    image_ids = Photo.query.filter_by(user_id=username).all()
+    image_id_records = Photo.query.filter_by(user_id=username).all()
+    image_ids = [image.file_name for image in image_id_records]
+    print("IMAGE IDS", image_ids)
 
-    image_urls = User.get_user_images(image_ids)
+    image_urls = Photo.get_user_images(image_ids)
     return jsonify(image_urls)
 
 
 @app.post("/<username>/photos")
-# @require_user
+@require_user
 def upload_photo(username):
     """Upload image file from request data to AWS S3. Must be logged in as same
-    user at endpoint to access."""
+    user at endpoint to access. If unable to add, returns BadRequest error."""
 
     print("API ROUTE UPLOAD_PHOTO")
 
-    # if username != g.user.username:
-    #     raise Unauthorized
+    if username != g.user.username:
+        raise Unauthorized
 
     file = request.files['image-file']
-    file.filename = uuid()
+    file.filename = str(uuid.uuid4())
 
     try:
         ## save file to local folder
         file.save(os.path.join(UPLOAD_FOLDER, secure_filename(file.filename)))
 
         ## save file to S3
-        upload_photo(f"uploads/{file.filename}")
+        Photo.upload_photo(f"uploads/{file.filename}")
 
         ## save file name to db
         image_file = Photo(
@@ -235,4 +237,4 @@ def upload_photo(username):
     
     except:
         db.session.rollback()
-        raise BadRequest
+        raise BadRequest 

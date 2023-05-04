@@ -10,6 +10,8 @@ def require_user(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
+        print("REQUIRE_USER DECORATOR")
+        
         if g.user:
             return f(*args, **kwargs)
         
