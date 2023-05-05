@@ -46,6 +46,7 @@ debug = DebugToolbarExtension(app)
 def add_user_to_g():
     """If there is a user logged in, add the current user to Flask global."""
 
+    # breakpoint()
     token = None
     if "Authorization" in request.headers:
         token = request.headers["Authorization"]
@@ -62,11 +63,10 @@ def add_user_to_g():
                 g.user = current_user
             
         except Exception as e:
-            raise Unauthorized("Invalid token")
+            g.user = None
     
     else:
-        g.user = None
-    
+        g.user = None    
     
 
 @app.post('/signup')
@@ -85,7 +85,7 @@ def signup():
             hobbies=request.json["hobbies"],
             interests=request.json["interests"],
             postal_code=request.json["postal_code"],
-            search_radius=request.json["search_radius"],
+            search_radius=int(request.json["search_radius"]),
         )
         db.session.commit()
 
@@ -103,11 +103,14 @@ def login():
 
     Taken JSON username and password. Return JWT if valid user.
     If invalid, throw Unauthorized Error."""
+    # breakpoint()
 
     user = User.login(
         username=request.json["username"],
         password=request.json["password"]
     )
+
+    print("LOGIN, ", user)
 
     if user:
         token = User.create_token(user.username)
@@ -141,10 +144,10 @@ def update_user_profile(username):
 
     try:
         user.name = request.json["name"]
-        user.hobbies=request.json["hobbies"],
-        user.interests=request.json["interests"],
-        user.postal_code=request.json["postal_code"],
-        user.search_radius=request.json["search_radius"]
+        user.hobbies = request.json["hobbies"],
+        user.interests = request.json["interests"],
+        user.postal_code = request.json["postal_code"],
+        user.search_radius = int(request.json["search_radius"])
 
         db.session.commit()
     
@@ -189,7 +192,7 @@ def delete_user(username):
 ################################################################################
 # Photo Routes
 
-@app.get("/<username>/photos")
+@app.get("/users/<username>/photos")
 @require_user
 def get_photos(username):
     """Return all photos for a given username. Must be logged in to access."""
@@ -201,7 +204,7 @@ def get_photos(username):
     return jsonify(image_urls)
 
 
-@app.post("/<username>/photos")
+@app.post("/users/<username>/photos")
 @require_user
 def upload_photo(username):
     """Upload image file from request data to AWS S3. Must be logged in as same

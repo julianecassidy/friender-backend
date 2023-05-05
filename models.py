@@ -179,7 +179,7 @@ class User(db.Model):
     )
 
     postal_code = db.Column(
-        db.Integer,
+        db.String(10),
         nullable=False
     )
 
